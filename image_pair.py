@@ -151,7 +151,7 @@ class ImagePair(ABC):
         else:
             indexes = df.index.tolist()
         for i in range(0, len(indexes), batch_size):
-            yield df.iloc[indexes[i:i+batch_size]]
+            yield df.iloc[indexes[i*batch_size:(i+1)*batch_size]]
             
             
     @staticmethod           
