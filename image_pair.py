@@ -86,7 +86,10 @@ class ImagePair(ABC):
 
     
     def _get_file_list(self):
-        return os.listdir(self.img_dir)
+        fl = os.listdir(self.img_dir)
+        # filter png files
+        
+        return [i for i in fl if 'png' in i]
     
     
     def load_ds(self):
@@ -131,7 +134,7 @@ class ImagePair(ABC):
         return np.append(img1, img2, axis = axis)
     
     
-    def get_batch(self, ds='train', batch_size=32, reshuffle=True):
+    def get_batch(self, ds='train', batch_size=32, img_shape=[60,80,1], reshuffle=True):
         '''
         Yields batches of dataset of batch size
         '''
@@ -146,12 +149,25 @@ class ImagePair(ABC):
         else:
             df = self.ts_li
         
-        if reshuffle:
-            indexes = np.random.permutation( df.index.tolist() )
-        else:
-            indexes = df.index.tolist()
-        for i in range(0, len(indexes), batch_size):
-            yield df.iloc[indexes[i*batch_size:(i+1)*batch_size]]
+        while True:
+            if reshuffle:
+                indexes = np.random.permutation( df.index.tolist() )
+                
+            else:
+                indexes = df.index.tolist()
+           
+            for i in range(len(indexes)//batch_size+1):
+                x = np.zeros([batch_size]+img_shape)
+                y = np.zeros([batch_size, 2])
+                for j, row in enumerate(df.iloc[indexes[i*batch_size:(i+1)*batch_size]].as_matrix()):
+                    #print('row',row)
+                    img = self.get_merged_image(os.path.join(self.img_dir,row[0]),os.path.join(self.img_dir,row[1]),h=60,w=80)
+                    lbl = row[2]
+                    x[j] = np.expand_dims(img, axis=2)
+                    y[j] = np.eye(2)[lbl].tolist()
+                yield x,y
+                    
+            
             
             
     @staticmethod           
@@ -196,7 +212,7 @@ class ImagePair(ABC):
 
         img = cv2.resize(img, dsize=(w_re,h_re), interpolation = inter)
         img = cv2.copyMakeBorder(img, top=pad_t, bottom=pad_b, left = pad_l, right=pad_r, borderType=border_type)
-        return img
+        return img/255
     
     
     def pair_img(self, img1, img2, axis=0):
