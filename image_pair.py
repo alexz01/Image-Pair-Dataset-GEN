@@ -125,18 +125,34 @@ class ImagePair(ABC):
         elif axis==1:
             hi = h
             wi = w//2
+        elif axis==2:
+            hi=h
+            wi=w
         else:
             raise ValueError('Axis should be 0 or 1')
             
         img1 = ImagePair.padded_reshape(img1, h = hi, w= wi)
         img2 = ImagePair.padded_reshape(img2, h = hi, w= wi)
-        
+        img1 = np.expand_dims(img1,axis=2)
+        img2 = np.expand_dims(img2,axis=2)
+            
         return np.append(img1, img2, axis = axis)
     
     
-    def get_batch(self, ds='train', batch_size=32, img_shape=[60,80,1], reshuffle=True):
+    def get_batch(self, ds='train', batch_size=32, img_shape=[60,80,1], merge_axis=0, reshuffle=True, flat=False):
         '''
         Yields batches of dataset of batch size
+
+        Parameters:
+        ds : dataset to be batched one of [train, valid, test]
+        batch_size : size of batch
+        img_shape : shape of images in batch
+        merge_axis : merge axis of two images in pair
+        reshuffle : reshuffle after each epoch
+        flat : flat image to vector
+
+        Returns:
+        Tuple : [images, labels]  
         '''
         
         assert isinstance(ds, str), 'ds needs to be string'
@@ -149,6 +165,7 @@ class ImagePair(ABC):
         else:
             df = self.ts_li
         
+                
         while True:
             if reshuffle:
                 indexes = np.random.permutation( df.index.tolist() )
@@ -161,10 +178,13 @@ class ImagePair(ABC):
                 y = np.zeros([batch_size, 2])
                 for j, row in enumerate(df.iloc[indexes[i*batch_size:(i+1)*batch_size]].as_matrix()):
                     #print('row',row)
-                    img = self.get_merged_image(os.path.join(self.img_dir,row[0]),os.path.join(self.img_dir,row[1]),h=60,w=80)
+                    img = self.get_merged_image(os.path.join(self.img_dir,row[0]),os.path.join(self.img_dir,row[1]),h=img_shape[0],w=img_shape[1], axis=merge_axis, )
                     lbl = row[2]
-                    x[j] = np.expand_dims(img, axis=2)
+                    x[j] = img
                     y[j] = np.eye(2)[lbl].tolist()
+                    
+                if flat:
+                    x = np.reshape(x, [batch_size,-1])
                 yield x,y
                     
             
@@ -217,4 +237,4 @@ class ImagePair(ABC):
     
     def pair_img(self, img1, img2, axis=0):
         return np.append(img1, img2, axis)
-    
+  
